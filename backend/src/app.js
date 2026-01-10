@@ -5,10 +5,17 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+const uploadRouter = require('./routes/upload');
+const searchRouter = require('./routes/search');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Routes
+app.use('/api/upload', uploadRouter);
+app.use('/api/search', searchRouter);
 
 // Health Check
 app.get('/health', (req, res) => {
