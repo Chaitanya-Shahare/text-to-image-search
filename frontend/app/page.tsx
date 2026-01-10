@@ -16,6 +16,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedImage, setSelectedImage] = useState<SearchResult | null>(null);
+  const [searchTime, setSearchTime] = useState(0);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +25,8 @@ export default function Home() {
     setLoading(true);
     setHasSearched(true);
     setSelectedImage(null); // Clear selection on new search
+    
+    const startTime = performance.now();
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
@@ -37,6 +40,8 @@ export default function Home() {
       console.error(error);
       setResults([]);
     } finally {
+      const endTime = performance.now();
+      setSearchTime(endTime - startTime);
       setLoading(false);
     }
   };
@@ -73,7 +78,10 @@ export default function Home() {
       {hasSearched && (
         <div className="results-section">
           <h2 className="results-title">
-             Results <span className="results-count">{results.length} found</span>
+             Results 
+             <span className="results-count">
+                {results.length} found ({searchTime.toFixed(0)}ms)
+             </span>
           </h2>
           
           <div className="results-grid">

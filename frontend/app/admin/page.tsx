@@ -3,27 +3,27 @@
 import { useState } from 'react';
 
 export default function AdminPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<string>('');
-  const [preview, setPreview] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (selected) {
-        setFile(selected);
-        setPreview(URL.createObjectURL(selected));
+    if (e.target.files && e.target.files.length > 0) {
+        // Convert FileList to Array
+        setFiles(Array.from(e.target.files));
         setStatus('');
     }
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setUploading(true);
-    setStatus('Processing image and generating embeddings...');
+    setStatus(`Processing ${files.length} images... (This might take a while for embeddings)`);
 
     const formData = new FormData();
-    formData.append('image', file);
+    files.forEach(file => {
+        formData.append('images', file);
+    });
 
     try {
       const res = await fetch('/api/upload', {
@@ -34,9 +34,11 @@ export default function AdminPage() {
       const data = await res.json();
       
       if (res.ok) {
-        setStatus(`Success! Image uploaded (ID: ${data.image.id}) and indexed.`);
-        setFile(null);
-        setPreview(null);
+        setStatus(`Success! Processed ${data.images.length} images.`);
+        setFiles([]);
+        // Optional: clear file input
+        const input = document.getElementById('file-upload') as HTMLInputElement;
+        if (input) input.value = '';
       } else {
         setStatus(`Error: ${data.error}`);
       }
@@ -53,36 +55,41 @@ export default function AdminPage() {
       <h1 className="page-title">Admin Dashboard</h1>
       
       <div className="glass-panel admin-panel">
-        <h2 className="section-title">Upload New Image</h2>
-        <p className="subtitle">Select an image to index (JPG/PNG). Automatic CLIP embedding generation included.</p>
+        <h2 className="section-title">Upload New Images</h2>
+        <p className="subtitle">Select images to index (JPG/PNG). Automatic CLIP embedding generation included.</p>
         
         <div className="upload-zone">
             <input 
                 type="file" 
                 accept="image/*"
+                multiple
                 onChange={handleFileChange}
                 className="hidden-input"
                 id="file-upload"
             />
             <label htmlFor="file-upload" className="upload-label">
-                {preview ? (
-                    <img src={preview} alt="Preview" className="preview-img" />
+                {files.length > 0 ? (
+                    <div className="py-8">
+                         <span className="icon">📂</span>
+                         <span className="text text-xl block">{files.length} files selected</span>
+                         <span className="text-sm text-gray-400 block mt-2">{files.map(f => f.name).join(', ')}</span>
+                    </div>
                 ) : (
                     <div className="upload-placeholder">
                         <span className="icon">📁</span>
-                        <span className="text">Click to select file</span>
+                        <span className="text">Click to select files (Multiple allowed)</span>
                     </div>
                 )}
             </label>
         </div>
 
-        {file && (
+        {files.length > 0 && (
             <button 
                 className="btn full-width" 
                 onClick={handleUpload} 
                 disabled={uploading}
             >
-                {uploading ? 'Uploading & Indexing...' : 'Upload to Engine'}
+                {uploading ? 'Uploading & Indexing...' : `Upload ${files.length} Images`}
             </button>
         )}
 

@@ -46,8 +46,12 @@ router.get('/', async (req, res) => {
         // 4. Sort by score (descending)
         results.sort((a, b) => b.score - a.score);
 
-        // 5. Top 10
-        const topResults = results.slice(0, 10);
+        // 5. Threshold Filter (default 0.2)
+        const threshold = parseFloat(req.query.threshold) || 0.2;
+        const filteredResults = results.filter(r => r.score >= threshold);
+
+        // 6. Top 10
+        const topResults = filteredResults.slice(0, 10);
 
         res.json(topResults);
 

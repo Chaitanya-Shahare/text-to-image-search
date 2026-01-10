@@ -20,44 +20,57 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // POST /api/upload
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', upload.array('images', 20), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No image file provided' });
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'No image files provided' });
         }
 
-        const filePath = req.file.path;
-        console.log(`Processing upload: ${filePath}`);
+        const uploadedImages = [];
+        const errors = [];
 
-        // 1. Generate Embedding
-        const embedding = await ClipService.generateImageEmbedding(filePath);
+        for (const file of req.files) {
+            try {
+                const filePath = file.path;
+                console.log(`Processing upload: ${filePath}`);
 
-        // 2. Generate Basic Tags (Heuristic for now)
-        // We will improve this in Task 2.3
-        const tags = generateBasicTags(req.file.originalname);
+                // 1. Generate Embedding
+                const embedding = await ClipService.generateImageEmbedding(filePath);
 
-        // 3. Store in DB
-        const image = await Image.create({
-            filename: req.file.filename,
-            path: `/uploads/${req.file.filename}`, // Relative path for serving
-            mimetype: req.file.mimetype,
-            size: req.file.size,
-            embedding: embedding,
-            tags: tags
-        });
+                // 2. Generate Basic Tags
+                const tags = generateBasicTags(file.originalname);
+
+                // 3. Store in DB
+                const image = await Image.create({
+                    filename: file.filename,
+                    path: `/uploads/${file.filename}`,
+                    mimetype: file.mimetype,
+                    size: file.size,
+                    embedding: embedding,
+                    tags: tags
+                });
+
+                uploadedImages.push({
+                    id: image.id,
+                    filename: image.filename,
+                    tags: image.tags
+                });
+
+            } catch (err) {
+                console.error(`Failed to process ${file.originalname}:`, err);
+                errors.push({ filename: file.originalname, error: err.message });
+            }
+        }
 
         res.json({
-            message: 'Image uploaded and processed successfully',
-            image: {
-                id: image.id,
-                filename: image.filename,
-                tags: image.tags
-            }
+            message: `Processed ${uploadedImages.length} images successfully.`,
+            images: uploadedImages,
+            errors: errors.length > 0 ? errors : undefined
         });
 
     } catch (error) {
         console.error('Upload processing error:', error);
-        res.status(500).json({ error: 'Failed to process image' });
+        res.status(500).json({ error: 'Failed to process upload request' });
     }
 });
 
