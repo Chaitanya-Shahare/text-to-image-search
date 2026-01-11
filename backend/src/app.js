@@ -22,6 +22,12 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled Error:', err);
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+});
+
 // Database
 const sequelize = require('./config/database');
 const Image = require('./models/Image'); // Import to ensure model registration

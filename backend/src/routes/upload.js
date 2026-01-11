@@ -21,6 +21,8 @@ const upload = multer({ storage: storage });
 
 // POST /api/upload
 router.post('/', upload.array('images', 20), async (req, res) => {
+    const sharp = require('sharp'); // Dynamic import or move to top
+
     try {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: 'No image files provided' });
@@ -29,32 +31,54 @@ router.post('/', upload.array('images', 20), async (req, res) => {
         const uploadedImages = [];
         const errors = [];
 
+        // Predefined candidate tags (could be moved to config)
+        const candidateTags = [
+            'red car', 'blue car', 'white car', 'black car', 'silver car',
+            'sedan', 'suv', 'truck', 'coupe', 'convertible', 'hatchback',
+            'toyota', 'honda', 'bmw', 'ford', 'mercedes', 'audi', 'tesla', 'ferrari', 'lamborghini',
+            'luxury', 'sports car', 'vintage', 'family car'
+        ];
+
         for (const file of req.files) {
             try {
                 const filePath = file.path;
                 console.log(`Processing upload: ${filePath}`);
 
-                // 1. Generate Embedding
+                // 1. Extract Metadata with Sharp
+                const metadata = await sharp(filePath).metadata();
+                
+                // 2. Generate Embedding
                 const embedding = await ClipService.generateImageEmbedding(filePath);
 
-                // 2. Generate Basic Tags
-                const tags = generateBasicTags(file.originalname);
+                // 3. Generate AI Tags (Zero-Shot)
+                // Threshold 0.2 is reasonable for CLIP
+                const aiTags = await ClipService.generateZeroShotTags(filePath, candidateTags, 0.22);
+                
+                // Combine with basic heuristic tags if needed, but AI tags are superior
+                const basicTags = generateBasicTags(file.originalname);
+                const combinedTags = [...new Set([...aiTags, ...basicTags])];
 
-                // 3. Store in DB
+                // 4. Store in DB
                 const image = await Image.create({
                     filename: file.filename,
                     path: `/uploads/${file.filename}`,
                     mimetype: file.mimetype,
                     size: file.size,
+                    width: metadata.width,
+                    height: metadata.height,
                     embedding: embedding,
-                    tags: tags
+                    tags: combinedTags
                 });
 
                 uploadedImages.push({
                     id: image.id,
                     filename: image.filename,
-                    tags: image.tags
+                    tags: image.tags,
+                    width: image.width,
+                    height: image.height
                 });
+
+                console.log(`Processed ${file.filename}: ${combinedTags.join(', ')}`);
 
             } catch (err) {
                 console.error(`Failed to process ${file.originalname}:`, err);

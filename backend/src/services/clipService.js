@@ -11,7 +11,7 @@ class ClipService {
     static textModel = null;
     static processor = null;
     static visionModel = null;
-    static modelId = 'Xenova/clip-vit-base-patch32';
+    static modelId = 'Xenova/clip-vit-base-patch16'; // Higher accuracy
 
     static async loadModels() {
         if (!ClipService.tokenizer) {
@@ -71,6 +71,45 @@ class ClipService {
         
         // Normalize and return array
         return ClipService.normalize(image_embeds.data);
+    }
+
+    /**
+     * Perform Zero-Shot Classification.
+     * Computes similarity between the image and a list of candidate tags.
+     * @param {string} imagePath 
+     * @param {string[]} candidateTags 
+     * @param {number} threshold - Minimum score to include tag (default 0.2)
+     * @returns {Promise<string[]>}
+     */
+    static async generateZeroShotTags(imagePath, candidateTags, threshold = 0.2) {
+        await ClipService.loadModels();
+
+        // 1. Get Image Embedding
+        const imageEmbedding = await ClipService.generateImageEmbedding(imagePath);
+
+        // 2. Get Text Embeddings for candidates
+        // Note: For large lists, specialized bulk processing is better, but this works for MVP
+        const selectedTags = [];
+        
+        for (const tag of candidateTags) {
+            const textEmbedding = await ClipService.generateTextEmbedding(`a photo of a ${tag}`);
+            
+            // Dot product (Cosine Similarity since normalized)
+            let score = 0;
+            for (let i = 0; i < imageEmbedding.length; i++) {
+                score += imageEmbedding[i] * textEmbedding[i];
+            }
+
+            if (score > threshold) {
+                selectedTags.push({ tag, score });
+            }
+        }
+
+        // Sort by score
+        selectedTags.sort((a, b) => b.score - a.score);
+        
+        // Return just the strings
+        return selectedTags.map(t => t.tag);
     }
 
     static normalize(vectorData) {

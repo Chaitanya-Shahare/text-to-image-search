@@ -16,6 +16,12 @@ const Image = sequelize.define('Image', {
     size: {
         type: DataTypes.INTEGER
     },
+    width: {
+        type: DataTypes.INTEGER
+    },
+    height: {
+        type: DataTypes.INTEGER
+    },
     embedding: {
         type: DataTypes.JSON, 
         allowNull: true,

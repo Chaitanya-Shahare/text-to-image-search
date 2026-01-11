@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
 
     } catch (error) {
         console.error('Search error:', error);
-        res.status(500).json({ error: 'Failed to perform search' });
+        res.status(500).json({ error: 'Failed to perform search', details: error.message, stack: error.stack });
     }
 });
 
