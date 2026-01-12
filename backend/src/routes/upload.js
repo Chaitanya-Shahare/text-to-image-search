@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // POST /api/upload
-router.post('/', upload.array('images', 20), async (req, res) => {
+router.post('/', upload.array('images', 110), async (req, res) => {
     const sharp = require('sharp'); // Dynamic import or move to top
 
     try {
@@ -45,7 +45,18 @@ router.post('/', upload.array('images', 20), async (req, res) => {
                 console.log(`Processing upload: ${filePath}`);
 
                 // 1. Extract Metadata with Sharp
-                const metadata = await sharp(filePath).metadata();
+                // Wrap in try-catch specifically for metadata to catch corrupt files early
+                let metadata;
+                try {
+                    metadata = await sharp(filePath).metadata();
+                } catch (sharpError) {
+                    console.warn(`Skipping invalid image ${file.originalname}: ${sharpError.message}`);
+                    errors.push({ filename: file.originalname, error: 'Invalid or unsupported image format' });
+                    // Delete the invalid file to clean up
+                    const fs = require('fs');
+                    fs.unlink(filePath, () => {}); 
+                    continue; // Skip this file
+                }
                 
                 // 2. Generate Embedding
                 const embedding = await ClipService.generateImageEmbedding(filePath);

@@ -36,9 +36,13 @@ const Image = require('./models/Image'); // Import to ensure model registration
 if (require.main === module) {
     sequelize.sync().then(() => {
         console.log('Database synced.');
-        app.listen(PORT, () => {
+        const server = app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
         });
+
+        // Set timeout to 5 minutes to allow for long uploads/processing
+        server.setTimeout(5 * 60 * 1000); // 300,000 ms
+
     }).catch(err => {
         console.error('Failed to sync database:', err);
     });

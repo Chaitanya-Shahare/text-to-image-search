@@ -12,6 +12,7 @@ class ClipService {
     static processor = null;
     static visionModel = null;
     static modelId = 'Xenova/clip-vit-base-patch16'; // Higher accuracy
+    static textEmbeddingCache = new Map();
 
     static async loadModels() {
         if (!ClipService.tokenizer) {
@@ -39,6 +40,10 @@ class ClipService {
      * @returns {Promise<number[]>}
      */
     static async generateTextEmbedding(text) {
+        if (ClipService.textEmbeddingCache.has(text)) {
+            return ClipService.textEmbeddingCache.get(text);
+        }
+
         await ClipService.loadModels();
         
         // Tokenize
@@ -48,7 +53,12 @@ class ClipService {
         const { text_embeds } = await ClipService.textModel(inputs);
         
         // Normalize and return array
-        return ClipService.normalize(text_embeds.data);
+        const embedding = ClipService.normalize(text_embeds.data);
+        
+        // Cache result
+        ClipService.textEmbeddingCache.set(text, embedding);
+        
+        return embedding;
     }
 
     /**

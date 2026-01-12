@@ -18,35 +18,58 @@ export default function AdminPage() {
   const handleUpload = async () => {
     if (files.length === 0) return;
     setUploading(true);
-    setStatus(`Processing ${files.length} images... (This might take a while for embeddings)`);
+    setStatus('Initializing upload...');
 
-    const formData = new FormData();
-    files.forEach(file => {
-        formData.append('images', file);
-    });
+    const BATCH_SIZE = 5;
+    const totalFiles = files.length;
+    let processedCount = 0;
+    let successCount = 0;
+    const allErrors: string[] = [];
 
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok) {
-        setStatus(`Success! Processed ${data.images.length} images.`);
+    // Chunk files manually
+    for (let i = 0; i < totalFiles; i += BATCH_SIZE) {
+        const chunk = files.slice(i, i + BATCH_SIZE);
+        const formData = new FormData();
+        chunk.forEach(file => formData.append('images', file));
+
+        setStatus(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(totalFiles / BATCH_SIZE)}... (${processedCount}/${totalFiles} completed)`);
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok) {
+                successCount += (data.images ? data.images.length : 0);
+                // Accumulate errors if any partial errors returned
+                if (data.errors) {
+                     data.errors.forEach((err: any) => allErrors.push(`${err.filename}: ${err.error}`));
+                }
+            } else {
+                allErrors.push(`Batch failed: ${data.error || 'Unknown error'}`);
+            }
+        } catch (e: any) {
+            console.error(e);
+            allErrors.push(`Network error on batch: ${e.message}`);
+        }
+        
+        processedCount += chunk.length;
+    }
+
+    setUploading(false);
+    
+    // Final Status Report
+    if (allErrors.length === 0) {
+        setStatus(`Success! All ${successCount} images uploaded and indexed.`);
         setFiles([]);
-        // Optional: clear file input
-        const input = document.getElementById('file-upload') as HTMLInputElement;
-        if (input) input.value = '';
-      } else {
-        setStatus(`Error: ${data.error}`);
-      }
-    } catch (e) {
-      console.error(e);
-      setStatus('Upload failed. Check console.');
-    } finally {
-      setUploading(false);
+         const input = document.getElementById('file-upload') as HTMLInputElement;
+         if (input) input.value = '';
+    } else {
+        setStatus(`Completed with issues. ${successCount} succeeded. ${allErrors.length} failed. Check console for details.`);
+        console.error('Upload Errors:', allErrors);
     }
   };
 
@@ -72,7 +95,10 @@ export default function AdminPage() {
                     <div className="py-8">
                          <span className="icon">📂</span>
                          <span className="text text-xl block">{files.length} files selected</span>
-                         <span className="text-sm text-gray-400 block mt-2">{files.map(f => f.name).join(', ')}</span>
+                         <span className="text-sm text-gray-400 block mt-2">
+                            {files.slice(0, 3).map(f => f.name).join(', ')}
+                            {files.length > 3 && ` ... +${files.length - 3} more`}
+                         </span>
                     </div>
                 ) : (
                     <div className="upload-placeholder">
@@ -88,8 +114,14 @@ export default function AdminPage() {
                 className="btn full-width" 
                 onClick={handleUpload} 
                 disabled={uploading}
+                style={{ opacity: uploading ? 0.7 : 1, cursor: uploading ? 'wait' : 'pointer' }}
             >
-                {uploading ? 'Uploading & Indexing...' : `Upload ${files.length} Images`}
+                {uploading ? (
+                    <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                        Processing {files.length} images...
+                    </span>
+                ) : `Upload ${files.length} Images`}
             </button>
         )}
 
